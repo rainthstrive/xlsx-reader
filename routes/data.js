@@ -1,17 +1,19 @@
+// Dependencias para procesamiento de Excel
+const cargarArchivoXLSX = require("../xlsx_processing/processing.js")
+// Uso de librería Express
 var express = require("express");
 var router = express.Router();
-
+// Uso de librería dotenv
+require('dotenv').config();
 // Multer para subida de archivos
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
-// XLSX para manejo de archivos Excel
-const xlsx = require("xlsx");
 // Mongoose para manejo de MongoDB
 const mongoose = require("mongoose");
 // Conexión abierta de MongoDB para manejar todas las peticiones
 mongoose
     .connect(
-      "mongodb+srv://admin2023:admin2023@rainth-test-cluster.6abyclm.mongodb.net/?retryWrites=true&w=majority",
+      process.env.DBCONN,
       {
         useNewUrlParser: true,
         useUnifiedTopology: true,
@@ -39,7 +41,9 @@ const workbookSchema = new mongoose.Schema({
   ],
   errores: [
     {
-      info: String,
+      fila: Number,
+      columna: String,
+      mensaje: String
     },
   ],
 });
@@ -47,14 +51,12 @@ const workbookSchema = new mongoose.Schema({
 const workbookModel = mongoose.model("WbRequest", workbookSchema);
 
 router.post("/upload", upload.single("file"), async function (req, res, next) {
-  const filePath = xlsx.readFile(req.file.path);
-
   try {
     // Crear el documento del pedido con el estado "pendiente"
     const nuevoObjeto = await workbookModel.create({});
     // Devolver solo el ID del documento como respuesta inicial
     res.status(201).json({ id: nuevoObjeto._id });
-    processXLSXFile(filePath, nuevoObjeto._id);
+    processXLSXFile(req.file.path, nuevoObjeto._id);
   } catch(error) {
     // Manejo interno de errores
     console.error('Error al subir el objeto a MongoDB: ', error);
@@ -63,28 +65,23 @@ router.post("/upload", upload.single("file"), async function (req, res, next) {
   
 });
 
-async function processXLSXFile(filePath, objetoId){
+async function processXLSXFile(in_filePath, objetoId){
   try {
-    const sheet_name_list = filePath.SheetNames;
-    const data = xlsx.utils.sheet_to_json(filePath.Sheets[sheet_name_list[0]]);
-    data.forEach((row) => {
-      row.Edad = Number(row.Edad);
-    });
-    data.forEach((row) => {
-      row.Nums = row.Nums.split(",").map((value) => Number(value.trim()));
-    });
+    // Comienza procesamiento de Excel //
+    const data = cargarArchivoXLSX(in_filePath);
+    // Termina procesamiento de Excel //
     console.log('calling');
     const result = await resolveAfter10Seconds();
     console.log(result);
     await workbookModel.findByIdAndUpdate(objetoId, { 
       estado: 'done', 
-      datos: data
+      datos: data.data,
+      errores: data.errores
     });
     console.log(data);
   } catch(error) {
     // Manejo interno de errores
     console.error('Error al procesar el archivo XLXS: ', error);
-    await workbookModel.findByIdAndUpdate(objetoId, { estado: 'done', errores: error });
   }
 }
 
