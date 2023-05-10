@@ -1,0 +1,17 @@
+{
+    "version": 2,
+    "framework": "node",
+    "name": "xlsx-reader",
+    "builds": [
+        {
+            "src": "index.js",
+            "use": "@vercel/node"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.¨)",
+            "dest": "/index.js"
+        }
+    ]
+}
